@@ -34,9 +34,7 @@ Healthcare-Patient-Intake-Appointment/
 ├── setup/
 │   └── SETUP.md
 ├── workflow/
-│   └── Healthcare_Patient_Intake_Appointment_Agent.json
-└── examples/
-    └── .gitkeep
+    └── Healthcare_Patient_Intake_Appointment_Agent.json
 ```
 
 ## Requirements
