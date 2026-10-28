@@ -191,4 +191,4 @@ Delete synthetic test records after testing, if appropriate for your test proces
 
 Do not activate this workflow for real patient use until credentials and placeholders are configured, all branches and tool failures have been tested, staff escalation is operational, and your organization has reviewed privacy, security, clinical safety, and applicable compliance requirements.
 
-See [the project overview](../documentation/OVERVIEW.md) for a high-level explanation of the workflow.
+
