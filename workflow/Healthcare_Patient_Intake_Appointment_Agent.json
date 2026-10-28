@@ -1,0 +1,668 @@
+{
+  "name": "Healthcare Patient Intake & Appointment Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "a8a3f1ae-7792-415b-b438-4684b2a74968",
+      "name": "Patient Message (Telegram)",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        304
+      ],
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "chatId",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "number"
+            },
+            {
+              "id": "a2",
+              "name": "text",
+              "value": "={{ $json.message.text ?? \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "firstName",
+              "value": "={{ $json.message.from?.first_name ?? \"Patient\" }}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "isUrgent",
+              "value": "={{ /chest pain|chest ma pain|chest ma dukhave|heart attack|cant breathe|can.t breathe|cannot breathe|difficulty breathing|shortness of breath|shwas nathi|saans nahi|unconscious|not breathing|severe bleeding|heavy bleeding|stroke|seizure|suicide|kill myself|hurt myself|end my life|overdose|poison|choking|paralys/i.test(($json.message?.text ?? '').toLowerCase()) }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f0c09909-ede3-4d72-b8e3-251e58e938af",
+      "name": "Prepare Message + Urgent Check",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        544,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.isUrgent }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d9c241e6-4887-4210-8196-1300dc0e0f19",
+      "name": "Is Urgent?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        848,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_STAFF_TELEGRAM_CHAT_ID",
+        "text": "=URGENT - HUMAN REVIEW NEEDED\nPatient: {{ $json.firstName }}\nTelegram chat ID: {{ $json.chatId }}\nMessage: {{ $json.text }}\nTime: {{ $now.toFormat(\"dd LLL yyyy, HH:mm\") }}\nAction: contact this patient immediately. No appointment was booked by the AI.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "56b8dd35-366f-45b0-bb44-486f5cea7e68",
+      "name": "Alert Staff (Urgent)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1152,
+        144
+      ],
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Patient Message (Telegram)').first().json.message.chat.id }}",
+        "text": "What you describe may be an emergency. I am an AI assistant and cannot give medical advice. Please call your local emergency number (112 in India) or go to the nearest emergency room right now. I have also alerted our clinic staff, and a team member will contact you as soon as possible.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "86ac3818-1e73-451b-9228-53fe9ec2e32c",
+      "name": "Urgent Reply to Patient",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        144
+      ],
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.text }}",
+        "options": {
+          "systemMessage": "=You are the virtual front-desk assistant for \"CityCare Clinic\". You are an AI, not a doctor or nurse. You ONLY handle administrative patient intake and appointment scheduling.\n\nABSOLUTE SAFETY RULES\n1. Never diagnose, never suggest or name medicines or dosages, never interpret symptoms, never give treatment or home-remedy advice. If asked, politely refuse and say a doctor must answer that, then offer to book an appointment.\n2. If the patient mentions anything that sounds urgent or dangerous (chest pain, trouble breathing, heavy bleeding, fainting, stroke signs, seizure, self-harm, suicidal thoughts, poisoning, severe injury, a baby or elderly person in distress), STOP booking. Tell them to call 112 or go to the nearest emergency room, and call the tool \"Escalate to Human Staff\". Do not book anything.\n3. If you are unsure, the request is ambiguous after two follow-ups, or the patient is upset or asks for a human, call \"Escalate to Human Staff\" and tell the patient a staff member will contact them.\n4. Always say you are an AI assistant if asked. Be warm, short and clear. Reply in the same language the patient uses (English, Hindi or Gujarati).\n5. Write plain text only. Do NOT use markdown, asterisks, underscores, bullet symbols or backticks. Use simple lines like \"Name: Raju Patel\".\n\nINTAKE FIELDS (collect all before booking, ask 1-2 at a time)\n- Full name\n- Age\n- Phone number (must be a valid 10-digit Indian mobile number; if invalid, ask again)\n- Reason for visit (in their own words)\n\nDEPARTMENTS (choose only from this list, based on the reason; this is routing, not diagnosis)\n- General Medicine: fever, cold, cough, weakness, general check-up, unclear complaints\n- Orthopedics: bone, joint, knee, back, shoulder, fracture, sports injury\n- Dermatology: skin, rash, hair, nail, acne, allergy on skin\n- Pediatrics: child under 14 years\n- ENT: ear, nose, throat, sinus, hearing\n- Gynecology: pregnancy, periods, womens health\nIf the reason is vague (for example \"I do not feel good\"), ask one simple follow-up question. If still unclear, route to General Medicine.\n\nBOOKING FLOW\n1. Collect the intake fields.\n2. Pick the department and tell the patient which one.\n3. Call \"Check Available Slots\" with the department. Offer at most 3 options (doctor, date, time).\n4. If no slots are available, say so, and offer another date or an alternative from the same department, or escalate to staff.\n5. Once the patient clearly confirms ONE slot, call \"Book Slot\" with its Slot_ID. Wait for its result.\n6. Only after \"Book Slot\" has returned, call \"Save Patient Appointment\" with all details. IMPORTANT: call tools strictly ONE AT A TIME, never two tools in the same step.\n7. Only AFTER both tools returned success, confirm the final details to the patient: name, department, doctor, date, time. Remind them to arrive 10 minutes early and bring any previous reports.\n\nTOOL FAILURE RULE\nNever say an appointment is booked or confirmed unless you actually called \"Book Slot\" and \"Save Patient Appointment\" in this conversation and both succeeded. If either tool returns an error, do not claim success. Apologize, say the booking could not be completed, and call \"Escalate to Human Staff\".\n\nNever invent slots, doctors, or times. Only use data returned by the tools. Never book without explicit confirmation. Today is {{ $now.toFormat(\"cccc, dd LLL yyyy\") }}."
+        }
+      },
+      "id": "85ff70fd-681d-4ba6-9918-3ffffbf5c6a9",
+      "name": "Patient Intake Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1152,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {}
+      },
+      "id": "94a076ed-bb5b-4176-8edb-f8c56a8dfc28",
+      "name": "Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        704
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "name": "Google Gemini account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ String($('Patient Message (Telegram)').first().json.message.chat.id) + '-v2' }}",
+        "contextWindowLength": 12
+      },
+      "id": "d2e34ccf-bcf0-43d7-ab45-77ecd65c74ac",
+      "name": "Conversation Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1312,
+        704
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEETS_DOCUMENT_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Slots"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Department",
+              "lookupValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('department', 'Exact department name, e.g. Orthopedics') }}"
+            },
+            {
+              "lookupColumn": "Status",
+              "lookupValue": "Available"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "38d6ab2c-b721-4adb-ad81-86f16249944a",
+      "name": "Check Available Slots",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1472,
+        704
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEETS_DOCUMENT_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Slots"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [
+            "Slot_ID"
+          ],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Slot_ID",
+              "id": "Slot_ID",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Department",
+              "id": "Department",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Doctor",
+              "id": "Doctor",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Date",
+              "id": "Date",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Time",
+              "id": "Time",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Status",
+              "id": "Status",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "Slot_ID": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('slot_id', 'Slot_ID of the slot the patient confirmed') }}",
+            "Status": "Booked"
+          }
+        },
+        "options": {}
+      },
+      "id": "7e37cf68-8622-408f-ac78-08f22dbf2e38",
+      "name": "Book Slot",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1632,
+        704
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEETS_DOCUMENT_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Appointments"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Timestamp",
+              "id": "Timestamp",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Telegram_Chat_ID",
+              "id": "Telegram_Chat_ID",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Patient_Name",
+              "id": "Patient_Name",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Age",
+              "id": "Age",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Phone",
+              "id": "Phone",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Department",
+              "id": "Department",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Reason_For_Visit",
+              "id": "Reason_For_Visit",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Slot_ID",
+              "id": "Slot_ID",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Doctor",
+              "id": "Doctor",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Date",
+              "id": "Date",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Time",
+              "id": "Time",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "Status",
+              "id": "Status",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "Age": "={{ $fromAI('age', 'Age of the patient in years', 'string') }}",
+            "Date": "={{ $fromAI('date', 'Appointment date from the slot', 'string') }}",
+            "Department": "={{ $fromAI('department', 'Department name', 'string') }}",
+            "Doctor": "={{ $fromAI('doctor', 'Doctor name from the slot', 'string') }}",
+            "Patient_Name": "={{ $fromAI('patient_name', 'Full name of the patient', 'string') }}",
+            "Phone": "={{ $fromAI('phone', '10-digit phone number', 'string') }}",
+            "Reason_For_Visit": "={{ $fromAI('reason', 'Short administrative description of the visit reason, in the patients own words', 'string') }}",
+            "Slot_ID": "={{ $fromAI('slot_id', 'Confirmed Slot_ID', 'string') }}",
+            "Status": "Confirmed",
+            "Telegram_Chat_ID": "={{ String($('Patient Message (Telegram)').first().json.message.chat.id) }}",
+            "Time": "={{ $fromAI('time', 'Appointment time from the slot', 'string') }}",
+            "Timestamp": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "8111095e-6904-4c3a-9add-a4b8d34b8209",
+      "name": "Save Patient Appointment",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1792,
+        704
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_STAFF_TELEGRAM_CHAT_ID",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('escalation_message', 'Short summary: patient name, Telegram chat ID, what they asked, and why a human is needed') }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "53667ccb-ccf3-4b72-9bf6-fb97e7780739",
+      "name": "Escalate to Human Staff",
+      "type": "n8n-nodes-base.telegramTool",
+      "typeVersion": 1.2,
+      "position": [
+        1952,
+        704
+      ],
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Patient Message (Telegram)').first().json.message.chat.id }}",
+        "text": "={{ String($json.output).replace(/[*_`\\[\\]]/g, '') }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "b19f056a-263f-4732-afa3-0b8e534cf527",
+      "name": "Reply to Patient",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1504,
+        464
+      ],
+      "credentials": {
+        "telegramApi": {
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Patient Message (Telegram)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Message + Urgent Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Message + Urgent Check": {
+      "main": [
+        [
+          {
+            "node": "Is Urgent?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Urgent?": {
+      "main": [
+        [
+          {
+            "node": "Alert Staff (Urgent)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Patient Intake Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Staff (Urgent)": {
+      "main": [
+        [
+          {
+            "node": "Urgent Reply to Patient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Patient Intake Agent": {
+      "main": [
+        [
+          {
+            "node": "Reply to Patient",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Patient Intake Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Patient Intake Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Available Slots": {
+      "ai_tool": [
+        [
+          {
+            "node": "Patient Intake Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Book Slot": {
+      "ai_tool": [
+        [
+          {
+            "node": "Patient Intake Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Patient Appointment": {
+      "ai_tool": [
+        [
+          {
+            "node": "Patient Intake Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate to Human Staff": {
+      "ai_tool": [
+        [
+          {
+            "node": "Patient Intake Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  },
+  "versionId": "7024c9cc-10f0-471d-a713-8ce12a4de9ef",
+  "tags": []
+}
